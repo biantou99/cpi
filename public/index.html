@@ -1,42 +1,87 @@
-<html>
-
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <title>Express</title>
-  <link rel="stylesheet" href="/stylesheets/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>消費者物價指數</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 18px;
+            text-align: left;
+        }
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+            color: #333;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        input[type="number"], input[type="date"] {
+            padding: 5px;
+            font-size: 16px;
+        }
+    </style>
 </head>
-
 <body>
-  <h1>Express</h1>
-  <p>Welcome to Express</p>
-  <!--產生 可以輸入 電影台詞 電影角色 電影名稱 (provider, movie_title, quote) 的表單，不使用 action-->
-    <form>
-        <input type="text" name="provider" placeholder="provider">
-        <input type="text" name="movie_title" placeholder="movie_title">
-        <input type="text" name="quote" placeholder="quote">
-        <button type="submit">Submit</button>
-    </form>
-  <!--將上面表單的資料，透過 fetch async await 來發送 POST 請求到 /api/insert ，並在成功後，用 p 顯示伺服器回傳的【純文字】訊息，不是 json-->
-    <p></p>
-    <script>
-        const form = document.querySelector('form');
-        const p = document.querySelector('p');
-        form.addEventListener('submit', async (event) => {
+<h1>學雜費CPI</h1>
+<form id="dataForm">
+    <label for="start_date">開始區間:</label>
+    <input type="date" id="start_date" name="start_date" value="2019-01-01" required>
+    <label for="end_date">結束區間:</label>
+    <input type="date" id="end_date" name="end_date" required>
+    <br/>
+    <label for="min_votes">最小值:</label>
+    <input type="number" id="min_votes" name="min_votes" min="0" max="200" value="80" required>
+    <label for="max_votes">最大值:</label>
+    <input type="number" id="max_votes" name="max_votes" min="0" max="200" value="120" required>
+    <br/>
+    <button type="submit">查詢</button>
+</form>
+<div id="tableContainer"></div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = document.getElementById('dataForm');
+        const endDateInput = document.getElementById('end_date');
+
+        const today = new Date().toISOString().split('T')[0];
+        endDateInput.value = today;
+        form.addEventListener('submit', (event) => {
             event.preventDefault();
-            const provider = form.querySelector('input[name="provider"]').value;
-            const movie_title = form.querySelector('input[name="movie_title"]').value;
-            const quote = form.querySelector('input[name="quote"]').value;
-            const response = await fetch('/api/insert', {
+
+            const formData = new FormData(form);
+            const data = {
+                start_date: formData.get('start_date'),
+                end_date: formData.get('end_date'),
+                min_votes: formData.get('min_votes'),
+                max_votes: formData.get('max_votes')
+            };
+
+            fetch('/api/fees', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ provider, movie_title, quote })
-            });
-            const text = await response.text();
-            p.textContent = text;
+                body: JSON.stringify(data)
+            })
+                .then(response => response.text())
+                .then(data => {
+                    const tableContainer = document.getElementById('tableContainer');
+                    tableContainer.innerHTML = data;
+                })
+                .catch(error => console.error('Error fetching data:', error));
         });
-    </script>
-
+    });
+</script>
 </body>
-
 </html>
