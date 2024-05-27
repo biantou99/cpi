@@ -24,62 +24,104 @@ var db = new sqlite3.Database('db/sqlite.db', (err) => {
   }
   console.log('Connected to the sqlite database.');
 });
-//撰寫 post /api/insert 路由，使用 SQLite 新增一筆電影台詞資料 (provider, movie_title, quote)，到MovieQuotes 中，回傳文字的訊息，不要 json
-app.post('/api/insert', (req, res) => {
-  const provider = req.body.provider;
-  const movie_title = req.body.movie_title;
-  const quote = req.body.quote;
-  const sql = `INSERT INTO MovieQuotes (provider, movie_title, quote) VALUES ('${provider}', '${movie_title}', '${quote}')`;
-  db.run(sql, (err) => {
-    if (err) {
-      return res.send('新增失敗');
-    }
-    return res.send('新增成功');
-  });
-});
-//撰寫 /api/quotes 路由，使用 SQL 來查詢 movie_quotes 所有的電影台詞資料，回傳 json 格式的資料就好
-app.get('/api/quotes', (req, res) => {
-  const sql = 'SELECT * FROM data';
-  db.all(sql, [], (err, rows) => {
+
+
+function formatTaiwanDate(dateStr) {
+  const date = new Date(dateStr);
+  const taiwanYear = date.getFullYear() - 1911;
+  const taiwanMonth = date.getMonth() + 1;
+  return {
+    year: taiwanYear,
+    month: taiwanMonth
+  };
+}
+
+app.all('/api/fees', (req, res) => {
+  const { start_date, end_date, min_votes, max_votes } = req.body;
+
+  console.log(start_date);
+  console.log(end_date);
+
+
+  let sql = 'SELECT datetime, value FROM data';
+  const params = [];
+  const conditions = [];
+
+  if (start_date && end_date) {
+    const startYearMonth = formatTaiwanDate(start_date);
+    const endYearMonth = formatTaiwanDate(end_date);
+    conditions.push(`
+      (CAST(substr(datetime, 1, instr(datetime, '年') - 1) AS INTEGER) * 12 + 
+      CAST(substr(datetime, instr(datetime, '年') + 1, instr(datetime, '月') - instr(datetime, '年') - 1) AS INTEGER))
+      BETWEEN (CAST(? AS INTEGER) * 12 + CAST(? AS INTEGER))
+      AND (CAST(? AS INTEGER) * 12 + CAST(? AS INTEGER))
+    `);
+    params.push(startYearMonth.year, startYearMonth.month, endYearMonth.year, endYearMonth.month);
+  }
+
+  if (min_votes && max_votes) {
+    conditions.push('(value > ? AND value < ?)');
+    params.push(min_votes, max_votes);
+  }
+
+  if (conditions.length > 0) {
+    sql += ' WHERE ' + conditions.join(' AND ');
+  }
+
+  // 打印最终生成的 SQL 和参数
+  console.log('Executing SQL:', sql);
+  console.log('With parameters:', params);
+  db.all(sql, params, (err, rows) => {
     if (err) {
       throw err;
     }
-    res.json(rows);
-  });
-});
-//撰寫 get /api?provider= 路由，使用 SQLite 查詢 MovieQuotes 中，某 provider 提供的所有資料
-app.get('/api', (req, res) => {
-  const provider = req.query.provider;
-  const sql = `SELECT * FROM MovieQuotes WHERE provider = '${provider}'`;
-  db.all(sql, [], (err, rows) => {
-    if (err) {
-      throw err;
-    }
-    res.json(rows);
-  });
-});
-//撰寫 post /api 路由，使用 SQLite 查詢 movie_quotes 中，某 provider 提供的所有資料
-app.post('/api', (req, res) => {
-  const provider = req.body.provider;
-  const sql = `SELECT * FROM MovieQuotes WHERE provider = '${provider}'`;
-  db.all(sql, [], (err, rows) => {
-    if (err) {
-      throw err;
-    }
-    res.json(rows);
-  });
-});
-//撰寫 get /api/insert 路由，使用 SQLite 新增一筆電影台詞資料 (provider, movie_title, quote)，到 MovieQuotes 中
-app.get('/api/insert', (req, res) => {
-  const provider = req.query.provider;
-  const movie_title = req.query.movie_title;
-  const quote = req.query.quote;
-  const sql = `INSERT INTO MovieQuotes (provider, movie_title, quote) VALUES ('${provider}', '${movie_title}', '${quote}')`;
-  db.run(sql, (err) => {
-    if (err) {
-      return res.send('新增失敗');
-    }
-    return res.send('新增成功');
+
+    let tableHTML = `
+      <style>
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 20px 0;
+          font-size: 18px;
+          text-align: left;
+        }
+        th, td {
+          padding: 12px;
+          border-bottom: 1px solid #ddd;
+        }
+        th {
+          background-color: #f2f2f2;
+          color: #333;
+        }
+        tr:hover {
+          background-color: #f5f5f5;
+        }
+      </style>
+      <table>
+        <thead>
+          <tr>
+            <th>統計期</th>
+            <th>學雜費</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    rows.forEach(row => {
+      tableHTML += `
+        <tr>
+          <td>${row.datetime}</td>
+          <td>${row.value}</td>
+        </tr>
+      `;
+    });
+
+    tableHTML += `
+        </tbody>
+      </table>
+    `;
+
+    res.send(tableHTML);
   });
 });
 
